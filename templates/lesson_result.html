@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <h1>Итог урока: {{ lesson.subject }} · {{ lesson.class_id }}</h1>
+    <p class="hint">Завершён: {{ lesson.finished_at.strftime('%d.%m.%Y %H:%M') }}</p>
+    <a class="btn btn-primary" href="{{ url_for('export_txt', lesson_id=lesson.id) }}">Скачать .txt</a>
+    <a class="btn" href="{{ url_for('teacher_dashboard') }}">К панели</a>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Присутствовали ({{ present|length }})</h2>
+        <ul class="list">
+        {% for s in present %}<li>{{ s.full_name }}</li>{% else %}
+            <li class="hint">Никого</li>{% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h2>Отсутствовали ({{ absent|length }})</h2>
+        <ul class="list">
+        {% for s in absent %}<li>{{ s.full_name }}</li>{% else %}
+            <li class="hint">Никого</li>{% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% endblock %}

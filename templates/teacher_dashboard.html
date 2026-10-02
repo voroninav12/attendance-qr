@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h1>Панель преподавателя</h1>
+        <a class="btn" href="{{ url_for('teacher_logout') }}">Выйти</a>
+    </div>
+    <p class="hint">Вы вошли как {{ teacher.full_name }}</p>
+</div>
+
+<div class="card">
+    <h2>Начать урок</h2>
+    <form method="post" action="{{ url_for('start_lesson') }}" class="grid">
+        <div>
+            <label>Класс</label>
+            <input type="text" name="class_id" value="11ВГ" required>
+        </div>
+        <div>
+            <label>Предмет</label>
+            <input type="text" name="subject" required>
+        </div>
+        <div style="grid-column:1/-1;">
+            <button type="submit" class="btn-primary">Начать урок</button>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Последние уроки</h2>
+    {% if lessons %}
+        <ul class="list">
+        {% for l in lessons %}
+            <li>
+                <div>
+                    <b>{{ l.subject }}</b> · {{ l.class_id }}<br>
+                    <span class="hint">{{ l.started_at.strftime('%d.%m.%Y %H:%M') }}
+                    {% if l.is_active %} · активен{% else %} · завершён{% endif %}</span>
+                </div>
+                <div>
+                    {% if l.is_active %}
+                        <a class="btn" href="{{ url_for('lesson_active', lesson_id=l.id) }}">Открыть</a>
+                    {% else %}
+                        <a class="btn" href="{{ url_for('lesson_result', lesson_id=l.id) }}">Результат</a>
+                    {% endif %}
+                </div>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p class="hint">Уроков пока не было.</p>
+    {% endif %}
+</div>
+
+{% endblock %}

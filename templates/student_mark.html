@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:420px;margin:60px auto;text-align:center;">
+{% if error %}
+    <h1>Ошибка</h1>
+    <p>{{ error }}</p>
+{% elif success %}
+    <h1>{% if already %}Уже отмечено{% else %}Отмечено{% endif %}</h1>
+    <p>{{ student.full_name }}<br>{{ lesson.subject }} · {{ lesson.class_id }}</p>
+{% endif %}
+</div>
+{% endblock %}

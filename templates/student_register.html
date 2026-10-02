@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width:420px;margin:60px auto;">
+    <h1>Регистрация ученика</h1>
+    <p class="hint">Введите ФИО и класс. Устройство запомнится, повторно вводить данные не нужно.</p>
+    <form method="post">
+        <label>ФИО</label>
+        <input type="text" name="full_name" placeholder="Александрова Анна" required>
+        <label>Класс</label>
+        <input type="text" name="class_id" placeholder="11А" required>
+        <button type="submit" class="btn-primary">Зарегистрировать устройство</button>
+    </form>
+</div>
+{% endblock %}

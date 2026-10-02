@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Урок{% endblock %}
+{% block content %}
+
+<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+            <h1>{{ lesson.subject }} · {{ lesson.class_id }}</h1>
+            <p class="hint">Начат: {{ lesson.started_at.strftime('%d.%m.%Y %H:%M') }}</p>
+        </div>
+        <form method="post" action="{{ url_for('finish_lesson', lesson_id=lesson.id) }}"
+              onsubmit="return confirm('Завершить урок?');">
+            <button type="submit" class="btn-danger">Завершить урок</button>
+        </form>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card qr">
+        <h2>QR-код для отметки</h2>
+        <img src="{{ qr_data }}" alt="QR">
+        <p class="hint" style="word-break:break-all;">{{ mark_url }}</p>
+    </div>
+    <div class="card">
+        <h2>Статистика</h2>
+        <div class="grid">
+            <div class="stat"><div class="num">{{ present|length + absent|length }}</div>
+                <div class="lbl">в классе</div></div>
+            <div class="stat"><div class="num">{{ present|length }}</div>
+                <div class="lbl">отметились</div></div>
+            <div class="stat"><div class="num">{{ absent|length }}</div>
+                <div class="lbl">не отмечены</div></div>
+        </div>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Присутствуют ({{ present|length }})</h2>
+        <ul class="list">
+        {% for s in present %}
+            <li>
+                <span>{{ s.full_name }}</span>
+                <form method="post" action="{{ url_for('unmark', lesson_id=lesson.id) }}">
+                    <input type="hidden" name="student_id" value="{{ s.id }}">
+                    <button type="submit">Снять</button>
+                </form>
+            </li>
+        {% else %}
+            <li class="hint">Пока никто не отметился</li>
+        {% endfor %}
+        </ul>
+    </div>
+    <div class="card">
+        <h2>Не отмечены ({{ absent|length }})</h2>
+        <ul class="list">
+        {% for s in absent %}
+            <li>
+                <span>{{ s.full_name }}</span>
+                <form method="post" action="{{ url_for('manual_mark', lesson_id=lesson.id) }}">
+                    <input type="hidden" name="student_id" value="{{ s.id }}">
+                    <button type="submit">Отметить</button>
+                </form>
+            </li>
+        {% else %}
+            <li class="hint">Все отмечены</li>
+        {% endfor %}
+        </ul>
+    </div>
+</div>
+
+{% endblock %}

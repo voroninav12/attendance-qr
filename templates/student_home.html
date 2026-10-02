@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="text-align:center;">
+    <h1>{{ student.full_name }}</h1>
+    <p class="hint">Класс: {{ student.class_id }} · Устройство привязано</p>
+    <p>Отсканируйте QR-код, который показывает преподаватель.</p>
+</div>
+{% endblock %}

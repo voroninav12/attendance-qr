@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Посещаемость{% endblock %}
+{% block content %}
+
+<div class="card">
+    <h1>Отметка посещаемости</h1>
+    <p class="hint">Система отметки присутствующих на уроке через QR-код.</p>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h2>Я преподаватель</h2>
+        <p class="hint">Войти, начать урок, показать QR-код, получить список.</p>
+        <a class="btn btn-primary" href="{{ url_for('teacher_login') }}">Войти</a>
+    </div>
+    <div class="card">
+        <h2>Я ученик</h2>
+        <p class="hint">Зарегистрировать устройство один раз.</p>
+        <a class="btn btn-primary" href="{{ url_for('student_register') }}">Регистрация</a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Как это работает</h2>
+    <ol>
+        <li>Ученик один раз регистрирует своё устройство.</li>
+        <li>Преподаватель нажимает «Начать урок» — появляется QR-код.</li>
+        <li>Ученики сканируют код и отмечаются.</li>
+        <li>Преподаватель нажимает «Завершить урок» — получает список и файл.</li>
+    </ol>
+</div>
+
+{% endblock %}

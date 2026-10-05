@@ -26,7 +26,6 @@ class Student(db.Model):
 
     @property
     def display_name(self):
-        # Отдаём как есть: "Алиева Кристина"
         return self.full_name
 
 

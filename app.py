@@ -8,6 +8,7 @@ from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, make_response, flash, abort)
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from models import db, Teacher, Student, Lesson, AttendanceMark
 
@@ -19,13 +20,13 @@ except Exception:
 
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///attendance.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/attendance_v2.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
-
-# ---------- Список класса (порядок важен!) ----------
 
 CLASS_ID = '11ВГ'
 
@@ -75,11 +76,8 @@ STUDENTS_LIST = [
     'Юдаева Мария',
 ]
 
-# Кто всегда присутствует (автоотметка при старте урока)
 ALWAYS_PRESENT = {'Воронина Вероника'}
 
-
-# ---------- Утилиты ----------
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -118,14 +116,11 @@ def abort_404():
 
 
 def get_class_students(class_id):
-    """Возвращает учеников класса в исходном порядке (по sort_order, потом по id)."""
     return (Student.query
             .filter_by(class_id=class_id, is_active=True)
             .order_by(Student.sort_order.asc(), Student.id.asc())
             .all())
 
-
-# ---------- Главная ----------
 
 @app.route('/')
 def index():
@@ -136,8 +131,6 @@ def index():
 def join():
     return redirect(url_for('student_register'))
 
-
-# ---------- Панель преподавателя ----------
 
 @app.route('/teacher/login', methods=['GET', 'POST'])
 def teacher_login():
@@ -189,9 +182,8 @@ def start_lesson():
         is_active=True,
     )
     db.session.add(lesson)
-    db.session.flush()  # чтобы получить lesson.id
+    db.session.flush()
 
-    # Автоотметка для "всегда присутствующих"
     students = get_class_students(class_id)
     for s in students:
         if s.full_name in ALWAYS_PRESENT:
@@ -332,8 +324,6 @@ def export_txt(lesson_id):
     return resp
 
 
-# ---------- Ученик ----------
-
 @app.route('/student/register', methods=['GET', 'POST'])
 def student_register():
     if request.method == 'POST':
@@ -344,14 +334,12 @@ def student_register():
             flash('Заполните все поля')
             return render_template('student_register.html', default_class=CLASS_ID)
 
-        # нормализуем: убираем лишние пробелы, приводим к нижнему регистру
         def normalize(s):
             return ' '.join(s.lower().split())
 
         target_name = normalize(full_name)
         target_class = normalize(class_id)
 
-        # ищем ученика этого класса без учёта регистра
         student = None
         for s in Student.query.filter_by(is_active=True).all():
             if normalize(s.class_id) == target_class and normalize(s.full_name) == target_name:
@@ -431,16 +419,16 @@ def reset_device(student_id):
     return redirect(request.referrer or url_for('teacher_dashboard'))
 
 
-# ---------- Инициализация ----------
-
 def init_db():
     with app.app_context():
         db.create_all()
 
         if not Teacher.query.first():
             t = Teacher(
-                username='teacher',
-                password_hash=hashlib.sha256(b'qwerty123123').hexdigest(),
+                username=os.environ.get('TEACHER_USERNAME', 'teacher'),
+                password_hash=hashlib.sha256(
+                    os.environ.get('TEACHER_PASSWORD', 'qwerty123123').encode()
+                ).hexdigest(),
                 full_name='Преподаватель',
             )
             db.session.add(t)
@@ -455,9 +443,10 @@ def init_db():
 
         db.session.commit()
         print(f'БД инициализирована. Класс {CLASS_ID}: {len(STUDENTS_LIST)} учеников.')
-        print('Логин: teacher / qwerty123123')
+
+
+init_db()
 
 
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)

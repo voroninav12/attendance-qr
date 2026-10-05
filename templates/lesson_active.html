@@ -27,9 +27,9 @@
             <div class="stat"><div class="num">{{ present|length + absent|length }}</div>
                 <div class="lbl">в классе</div></div>
             <div class="stat"><div class="num">{{ present|length }}</div>
-                <div class="lbl">отметились</div></div>
+                <div class="lbl">присутствуют</div></div>
             <div class="stat"><div class="num">{{ absent|length }}</div>
-                <div class="lbl">не отмечены</div></div>
+                <div class="lbl">отсутствуют</div></div>
         </div>
     </div>
 </div>
@@ -40,11 +40,15 @@
         <ul class="list">
         {% for s in present %}
             <li>
-                <span>{{ s.full_name }}</span>
+                <span>{{ s.display_name }}</span>
+                {% if s.full_name not in always_present %}
                 <form method="post" action="{{ url_for('unmark', lesson_id=lesson.id) }}">
                     <input type="hidden" name="student_id" value="{{ s.id }}">
                     <button type="submit">Снять</button>
                 </form>
+                {% else %}
+                <span class="hint">авто</span>
+                {% endif %}
             </li>
         {% else %}
             <li class="hint">Пока никто не отметился</li>
@@ -52,11 +56,11 @@
         </ul>
     </div>
     <div class="card">
-        <h2>Не отмечены ({{ absent|length }})</h2>
+        <h2>Отсутствуют ({{ absent|length }})</h2>
         <ul class="list">
         {% for s in absent %}
             <li>
-                <span>{{ s.full_name }}</span>
+                <span>{{ s.display_name }}</span>
                 <form method="post" action="{{ url_for('manual_mark', lesson_id=lesson.id) }}">
                     <input type="hidden" name="student_id" value="{{ s.id }}">
                     <button type="submit">Отметить</button>

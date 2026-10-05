@@ -12,14 +12,14 @@
     <div class="card">
         <h2>Присутствовали ({{ present|length }})</h2>
         <ul class="list">
-        {% for s in present %}<li>{{ s.full_name }}</li>{% else %}
+        {% for s in present %}<li>{{ s.display_name }}</li>{% else %}
             <li class="hint">Никого</li>{% endfor %}
         </ul>
     </div>
     <div class="card">
         <h2>Отсутствовали ({{ absent|length }})</h2>
         <ul class="list">
-        {% for s in absent %}<li>{{ s.full_name }}</li>{% else %}
+        {% for s in absent %}<li>{{ s.display_name }}</li>{% else %}
             <li class="hint">Никого</li>{% endfor %}
         </ul>
     </div>

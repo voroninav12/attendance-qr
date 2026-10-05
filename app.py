@@ -1,14 +1,13 @@
 import hashlib
 import io
 import base64
-import os
 import secrets
+import os
 from datetime import datetime
 from functools import wraps
 
 from flask import (Flask, render_template, request, redirect, url_for,
                    session, make_response, flash, abort)
-from werkzeug.middleware.proxy_fix import ProxyFix
 
 from models import db, Teacher, Student, Lesson, AttendanceMark
 
@@ -20,13 +19,67 @@ except Exception:
 
 
 app = Flask(__name__)
-app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-change-me')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/attendance.db'
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'change-me-in-production')
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///attendance.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
+
+# ---------- Список класса (порядок важен!) ----------
+
+CLASS_ID = '11ВГ'
+
+STUDENTS_LIST = [
+    'Алиева Кристина',
+    'Антипенков Владимир',
+    'Воронина Вероника',
+    'Грунин Алексей',
+    'Дьяченко Глеб',
+    'Евдокимова Светлана',
+    'Егоров Григорий',
+    'Иванов Артём',
+    'Камалов Мухаммадсаид',
+    'Карпинская Ульяна',
+    'Кейян Роман',
+    'Клеянкина Владислава',
+    'Козырь Анастасия',
+    'Корниенко Константин',
+    'Косов Павел',
+    'Коханенко Ярослав',
+    'Кроль Изабелла',
+    'Кужелева Кристина',
+    'Леонова Наталья',
+    'Малышева Елизавета',
+    'Матевосов Александр',
+    'Мирзоян Даниэль',
+    'Молов Мурат',
+    'Мосидзе Родион',
+    'Орлов Борис',
+    'Павлова Мария',
+    'Петров Вадим',
+    'Петрухин Алексей',
+    'Себенцова Вера',
+    'Сотников Даниил',
+    'Судакова Дарья',
+    'Сухова Ульяна',
+    'Талабаев Сергей',
+    'Тишаков Илья',
+    'Флатов Тимофей',
+    'Фрольцов Филипп',
+    'Ходов Алексей',
+    'Цыбуля Валерий',
+    'Чугуевский Григорий',
+    'Шульпин Евгений',
+    'Шумский Михаил',
+    'Эскин Михаил',
+    'Юдаева Мария',
+]
+
+# Кто всегда присутствует (автоотметка при старте урока)
+ALWAYS_PRESENT = {'Воронина Вероника'}
+
+
+# ---------- Утилиты ----------
 
 def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -64,6 +117,16 @@ def abort_404():
     abort(404)
 
 
+def get_class_students(class_id):
+    """Возвращает учеников класса в исходном порядке (по sort_order, потом по id)."""
+    return (Student.query
+            .filter_by(class_id=class_id, is_active=True)
+            .order_by(Student.sort_order.asc(), Student.id.asc())
+            .all())
+
+
+# ---------- Главная ----------
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -73,6 +136,8 @@ def index():
 def join():
     return redirect(url_for('student_register'))
 
+
+# ---------- Панель преподавателя ----------
 
 @app.route('/teacher/login', methods=['GET', 'POST'])
 def teacher_login():
@@ -101,7 +166,10 @@ def teacher_dashboard():
                .filter_by(teacher_id=teacher.id)
                .order_by(Lesson.started_at.desc())
                .limit(20).all())
-    return render_template('teacher_dashboard.html', teacher=teacher, lessons=lessons)
+    return render_template('teacher_dashboard.html',
+                           teacher=teacher,
+                           lessons=lessons,
+                           default_class=CLASS_ID)
 
 
 @app.route('/teacher/lesson/start', methods=['POST'])
@@ -121,6 +189,18 @@ def start_lesson():
         is_active=True,
     )
     db.session.add(lesson)
+    db.session.flush()  # чтобы получить lesson.id
+
+    # Автоотметка для "всегда присутствующих"
+    students = get_class_students(class_id)
+    for s in students:
+        if s.full_name in ALWAYS_PRESENT:
+            db.session.add(AttendanceMark(
+                lesson_id=lesson.id,
+                student_id=s.id,
+                method='auto',
+            ))
+
     db.session.commit()
     return redirect(url_for('lesson_active', lesson_id=lesson.id))
 
@@ -135,8 +215,7 @@ def lesson_active(lesson_id):
     mark_url = url_for('student_mark', token=lesson.token, _external=True)
     qr_data = make_qr_base64(mark_url)
 
-    students = Student.query.filter_by(class_id=lesson.class_id, is_active=True)\
-                            .order_by(Student.full_name).all()
+    students = get_class_students(lesson.class_id)
     marked_ids = {m.student_id for m in lesson.marks}
     present = [s for s in students if s.id in marked_ids]
     absent = [s for s in students if s.id not in marked_ids]
@@ -145,7 +224,8 @@ def lesson_active(lesson_id):
                            lesson=lesson, qr_data=qr_data,
                            mark_url=mark_url,
                            present=present, absent=absent,
-                           students=students)
+                           students=students,
+                           always_present=ALWAYS_PRESENT)
 
 
 @app.route('/teacher/lesson/<int:lesson_id>/finish', methods=['POST'])
@@ -167,8 +247,7 @@ def lesson_result(lesson_id):
     if lesson.teacher_id != session['teacher_id']:
         return "Forbidden", 403
 
-    students = Student.query.filter_by(class_id=lesson.class_id, is_active=True)\
-                            .order_by(Student.full_name).all()
+    students = get_class_students(lesson.class_id)
     marked_ids = {m.student_id for m in lesson.marks}
     present = [s for s in students if s.id in marked_ids]
     absent = [s for s in students if s.id not in marked_ids]
@@ -214,8 +293,7 @@ def export_txt(lesson_id):
     if lesson.teacher_id != session['teacher_id']:
         return "Forbidden", 403
 
-    students = Student.query.filter_by(class_id=lesson.class_id, is_active=True)\
-                            .order_by(Student.full_name).all()
+    students = get_class_students(lesson.class_id)
     marked_ids = {m.student_id for m in lesson.marks}
     present = [s for s in students if s.id in marked_ids]
     absent = [s for s in students if s.id not in marked_ids]
@@ -234,26 +312,27 @@ def export_txt(lesson_id):
     lines.append("=== ПРИСУТСТВОВАЛИ ===")
     if present:
         for i, s in enumerate(present, 1):
-            lines.append(f"{i}. {s.full_name}")
+            lines.append(f"{i}. {s.display_name}")
     else:
         lines.append("(нет)")
     lines.append("")
     lines.append("=== ОТСУТСТВОВАЛИ ===")
     if absent:
         for i, s in enumerate(absent, 1):
-            lines.append(f"{i}. {s.full_name}")
+            lines.append(f"{i}. {s.display_name}")
     else:
         lines.append("(нет)")
     lines.append("")
 
     text = "\r\n".join(lines)
-
     resp = make_response(text)
     resp.headers['Content-Type'] = 'text/plain; charset=utf-8'
     resp.headers['Content-Disposition'] = \
         f'attachment; filename=lesson_{lesson.id}.txt'
     return resp
 
+
+# ---------- Ученик ----------
 
 @app.route('/student/register', methods=['GET', 'POST'])
 def student_register():
@@ -263,18 +342,30 @@ def student_register():
 
         if not full_name or not class_id:
             flash('Заполните все поля')
-            return render_template('student_register.html')
+            return render_template('student_register.html', default_class=CLASS_ID)
 
-        student = Student.query.filter_by(
-            full_name=full_name, class_id=class_id, is_active=True).first()
+        # нормализуем: убираем лишние пробелы, приводим к нижнему регистру
+        def normalize(s):
+            return ' '.join(s.lower().split())
+
+        target_name = normalize(full_name)
+        target_class = normalize(class_id)
+
+        # ищем ученика этого класса без учёта регистра
+        student = None
+        for s in Student.query.filter_by(is_active=True).all():
+            if normalize(s.class_id) == target_class and normalize(s.full_name) == target_name:
+                student = s
+                break
+
         if not student:
             flash('Ученик не найден. Обратитесь к преподавателю.')
-            return render_template('student_register.html')
+            return render_template('student_register.html', default_class=CLASS_ID)
 
         if student.device_token_hash:
             flash('Этот ученик уже зарегистрирован на другом устройстве. '
                   'Обратитесь к преподавателю для сброса.')
-            return render_template('student_register.html')
+            return render_template('student_register.html', default_class=CLASS_ID)
 
         token = secrets.token_urlsafe(32)
         student.device_token_hash = hash_token(token)
@@ -286,7 +377,7 @@ def student_register():
                         httponly=True, samesite='Lax')
         return resp
 
-    return render_template('student_register.html')
+    return render_template('student_register.html', default_class=CLASS_ID)
 
 
 @app.route('/student/')
@@ -336,27 +427,37 @@ def reset_device(student_id):
     student = db.session.get(Student, student_id) or abort_404()
     student.device_token_hash = None
     db.session.commit()
-    flash(f'Привязка устройства для {student.full_name} сброшена.')
+    flash(f'Привязка устройства для {student.display_name} сброшена.')
     return redirect(request.referrer or url_for('teacher_dashboard'))
 
+
+# ---------- Инициализация ----------
 
 def init_db():
     with app.app_context():
         db.create_all()
+
         if not Teacher.query.first():
             t = Teacher(
-                username=os.environ.get('TEACHER_USERNAME', 'teacher'),
-                password_hash=hashlib.sha256(
-                    os.environ.get('TEACHER_PASSWORD', 'qwerty123123').encode()
-                ).hexdigest(),
+                username='teacher',
+                password_hash=hashlib.sha256(b'qwerty123123').hexdigest(),
                 full_name='Преподаватель',
             )
             db.session.add(t)
-            db.session.commit()
 
+        if not Student.query.first():
+            for i, name in enumerate(STUDENTS_LIST):
+                db.session.add(Student(
+                    full_name=name,
+                    class_id=CLASS_ID,
+                    sort_order=i,
+                ))
 
-init_db()
+        db.session.commit()
+        print(f'БД инициализирована. Класс {CLASS_ID}: {len(STUDENTS_LIST)} учеников.')
+        print('Логин: teacher / qwerty123123')
 
 
 if __name__ == '__main__':
+    init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)

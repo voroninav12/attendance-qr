@@ -14,7 +14,7 @@
     <form method="post" action="{{ url_for('start_lesson') }}" class="grid">
         <div>
             <label>Класс</label>
-            <input type="text" name="class_id" value="11ВГ" required>
+            <input type="text" name="class_id" value="{{ default_class }}" required>
         </div>
         <div>
             <label>Предмет</label>

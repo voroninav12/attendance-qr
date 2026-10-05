@@ -19,9 +19,15 @@ class Student(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     full_name = db.Column(db.String(200), nullable=False)
     class_id = db.Column(db.String(20), nullable=False)
+    sort_order = db.Column(db.Integer, default=0)
     device_token_hash = db.Column(db.String(128), unique=True, nullable=True)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def display_name(self):
+        # Отдаём как есть: "Алиева Кристина"
+        return self.full_name
 
 
 class Lesson(db.Model):
